@@ -60,6 +60,7 @@ console.log('🧾 Raw body:', req.body);
 
 const formattedQuestions = questions.map((q) => ({
   quiz_id: quizId,
+  user_id: userId, // ✅ ADD THIS LINE
   type: q.type,
   prompt: q.question,
   options: q.options || null,
