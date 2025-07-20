@@ -109,6 +109,11 @@ Return a clean JSON array as described above.`
   const csv = cards.map(c => `"${c.question}","${c.answer}"`).join('\n');
   fs.writeFileSync(filepath, 'Term,Definition\n' + csv);
   console.log('🧑‍💻 Generating flashcards with userId:', userId);
+    if (!userId || typeof userId !== 'string') {
+    console.error('❌ userId is invalid or undefined:', userId);
+    throw new Error('Cannot insert flashcards — userId is missing');
+  }
+
 
   if (deckId && cards.length > 0) {
     const flashcards = cards.map(card => ({
@@ -133,6 +138,12 @@ Return a clean JSON array as described above.`
       if (insertError) {
         console.error('❌ Flashcard insert error:', insertError);
       } else {
+                    const { data, error } = await supabase
+              .from('flashcards')
+              .insert(flashcards)
+              .select('id, user_id');
+
+            console.log('🧾 Inserted flashcards:', data);
         console.log(`✅ ${flashcards.length} flashcards inserted`);
       }
     } catch (err) {
