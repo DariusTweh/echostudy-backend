@@ -108,6 +108,7 @@ Return a clean JSON array as described above.`
   const filepath = path.join(outputDir, filename);
   const csv = cards.map(c => `"${c.question}","${c.answer}"`).join('\n');
   fs.writeFileSync(filepath, 'Term,Definition\n' + csv);
+  console.log('🧑‍💻 Generating flashcards with userId:', userId);
 
   if (deckId && cards.length > 0) {
     const flashcards = cards.map(card => ({
@@ -139,6 +140,8 @@ Return a clean JSON array as described above.`
     }
 
     try {
+      console.log('🧑‍💻  userId flashcard readu:', userId);
+
       const { error: updateError } = await supabase
         .from('flashcard_decks')
         .update({ status: 'ready', progress: null,tags:globalTags })
@@ -155,5 +158,5 @@ Return a clean JSON array as described above.`
     }
   }
 
-  return { filename, totalCards: cards.length };
+  return { filename, totalCards: cards.length,userId };
 };
