@@ -138,11 +138,7 @@ Return a clean JSON array as described above.`
       if (insertError) {
         console.error('❌ Flashcard insert error:', insertError);
       } else {
-                    const { data, error } = await supabase
-              .from('flashcards')
-              .insert(flashcards)
-              .select('id, user_id');
-
+                 
             console.log('🧾 Inserted flashcards:', data);
         console.log(`✅ ${flashcards.length} flashcards inserted`);
       }
