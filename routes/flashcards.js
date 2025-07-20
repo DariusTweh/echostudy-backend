@@ -7,20 +7,22 @@ import OpenAI from 'openai';
 
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
-
 router.post('/generate', upload.single('file'), async (req, res) => {
   const file = req.file;
-  if (!file) return res.status(400).json({ error: 'No file uploaded' });
+  const userId = req.body.userId;
+
+  if (!file || !userId || !req.body.deckId) {
+    return res.status(400).json({ error: 'Missing file, userId, or deckId' });
+  }
 
   try {
-    const result = await generateFlashcardsFromPdf(file.path, file.originalname, req.body.deckId);
+    const result = await generateFlashcardsFromPdf(file.path, file.originalname, req.body.deckId, userId);
     res.json(result);
   } catch (err) {
     console.error('❌ Error generating flashcards:', err);
     res.status(500).json({ error: 'Failed to process PDF' });
   }
 });
-
 router.post('/explain', async (req, res) => {
   const { flashcardId, userId } = req.body;
 

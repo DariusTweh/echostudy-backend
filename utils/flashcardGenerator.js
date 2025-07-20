@@ -18,7 +18,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-export const generateFlashcardsFromPdf = async (pdfPath, originalName, deckId) => {
+export const generateFlashcardsFromPdf = async (pdfPath, originalName, deckId,userId) => {
   const data = new Uint8Array(fs.readFileSync(pdfPath));
   const pdfDoc = await pdfjsLib.getDocument({ data }).promise;
 
@@ -112,6 +112,7 @@ Return a clean JSON array as described above.`
   if (deckId && cards.length > 0) {
     const flashcards = cards.map(card => ({
       deck_id: deckId,
+      user_id: userId, // ✅ Pass this from outside (see below)
       term: card.question?.trim() || '',
       definition: card.answer?.trim() || '',
       tags: Array.isArray(card.tags) ? card.tags : [],
