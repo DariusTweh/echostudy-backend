@@ -124,8 +124,14 @@ ${syllabusText}
       }));
       console.log('🧪 Deck payload:', examDecks);
 
-      const { error: deckErr } = await supabase.from('flashcard_decks').insert(examDecks);
-      if (deckErr) throw new Error('Failed to insert decks: ' + deckErr.message);
+     const { data: insertedDecks, error: deckErr } = await supabase
+      .from('flashcard_decks')
+      .insert(examDecks)
+      .select();
+
+    if (deckErr) throw new Error('Failed to insert decks: ' + deckErr.message);
+
+    console.log('✅ Inserted decks:', insertedDecks);
     }
 
     return parsed;
