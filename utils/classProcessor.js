@@ -115,11 +115,14 @@ ${syllabusText}
       if (assignErr) throw new Error('Failed to insert assignments: ' + assignErr.message);
 
       const examAssignments = formattedAssignments.filter(a => a.type.toLowerCase() === 'exam');
+        console.log('🧪 Inserting exam decks with userId:', userId);
       const examDecks = examAssignments.map(a => ({
         title: `${parsed.title} - ${a.title} Deck`,
         class_id: classId,
+        
         user_id: userId,
       }));
+      console.log('🧪 Deck payload:', examDecks);
 
       const { error: deckErr } = await supabase.from('flashcard_decks').insert(examDecks);
       if (deckErr) throw new Error('Failed to insert decks: ' + deckErr.message);
