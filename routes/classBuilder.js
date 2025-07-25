@@ -8,11 +8,16 @@ const upload = multer({ dest: 'uploads/' });
 
 router.post('/', upload.single('file'), async (req, res) => {
   const file = req.file;
+  const userId = req.body.userId; // ✅ Grab userId from body
 
-  // ✅ DEBUG 1: File presence
   if (!file) {
     console.warn('⚠️ No file received in request');
     return res.status(400).json({ error: 'No syllabus uploaded' });
+  }
+
+  if (!userId) {
+    console.warn('⚠️ No userId provided in request');
+    return res.status(400).json({ error: 'Missing userId' });
   }
 
   console.log('📎 File received:', {
@@ -22,17 +27,14 @@ router.post('/', upload.single('file'), async (req, res) => {
   });
 
   try {
-    // ✅ DEBUG 2: Start processing
     console.log('🔍 Starting syllabus processing...');
 
-    const result = await processSyllabusToClass(file.path);
+    const result = await processSyllabusToClass(file.path, userId); // ✅ Pass userId
 
-    // ✅ DEBUG 3: Log result
     console.log('✅ Parsed class data:', result);
 
     res.json(result);
   } catch (err) {
-    // ✅ DEBUG 4: Error handling
     console.error('❌ Error while processing syllabus:', err);
     res.status(500).json({ error: 'Syllabus parsing failed', details: err.message });
   }

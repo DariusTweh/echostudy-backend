@@ -4,6 +4,8 @@ import { extractTextFromPDF } from './pdfProcessor.js'; // requires a proper ESM
 import { OpenAI } from 'openai';
 import { extractTextChunksFromPDF } from './pdfProcessor.js'; // new import
 import { extractAndSummarizeChunks } from './pdfProcessor.js';
+import { detectSubjectFromPdf } from './pdfProcessor.js';
+
 dotenv.config();
 
 
@@ -28,60 +30,60 @@ export async function generateQuizFromDeck(deckId, types, count, difficulty) {
   console.log(`✅ [Deck] Retrieved ${data.length} flashcards from deck`);
 
   const prompt = `
-You are an AI quiz generator.
+  You are an AI quiz generator.
 
-Using the following flashcards, generate ${count} quiz questions.
+  Using the following flashcards, generate ${count} quiz questions.
 
-🎯 Required difficulty: ${difficulty || 'medium'}
-🧩 Allowed types: ${types.join(', ')}
+  🎯 Required difficulty: ${difficulty || 'medium'}
+  🧩 Allowed types: ${types.join(', ')}
 
-Format:
-[
-  {
-    "type": "mcq" | "short" | "fillblank" | "truefalse",
-    "question": "string",
-    "options": ["..."],           // only if type === "mcq"
-    "answer": "string or boolean",
-    "explanation": "string",
-    "difficulty": "easy" | "medium" | "hard"
-  }
-]
+  Format:
+  [
+    {
+      "type": "mcq" | "short" | "fillblank" | "truefalse",
+      "question": "string",
+      "options": ["..."],           // only if type === "mcq"
+      "answer": "string or boolean",
+      "explanation": "string",
+      "difficulty": "easy" | "medium" | "hard"
+    }
+  ]
 
-Rules:
-- All questions must match the "${difficulty || 'medium'}" level.
-- Only include "options" if type is "mcq".
-- Only use allowed types.
-- Respond ONLY with valid JSON. No extra text.
+  Rules:
+  - All questions must match the "${difficulty || 'medium'}" level.
+  - Only include "options" if type is "mcq".
+  - Only use allowed types.
+  - Respond ONLY with valid JSON. No extra text.
 
-FLASHCARDS:
-${JSON.stringify(data, null, 2)}
-`;
+  FLASHCARDS:
+  ${JSON.stringify(data, null, 2)}
+  `;
 
-  console.log('🧠 [Deck] Sending prompt to OpenAI...');
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.7,
-  });
+    console.log('🧠 [Deck] Sending prompt to OpenAI...');
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+    });
 
-  console.log('✅ [Deck] Received response from OpenAI');
+    console.log('✅ [Deck] Received response from OpenAI');
 
-  let content = response.choices[0].message.content.trim();
-  if (content.startsWith('```json')) {
-    content = content.replace(/```json\s*|\s*```/g, '');
-  }
+    let content = response.choices[0].message.content.trim();
+    if (content.startsWith('```json')) {
+      content = content.replace(/```json\s*|\s*```/g, '');
+    }
 
-  let parsed;
-  try {
-    parsed = JSON.parse(content);
-  } catch (err) {
-    console.error('❌ Quiz generation error: Could not parse JSON:', err.message);
-    throw new Error('Failed to parse OpenAI quiz response. Check formatting.');
-  }
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (err) {
+      console.error('❌ Quiz generation error: Could not parse JSON:', err.message);
+      throw new Error('Failed to parse OpenAI quiz response. Check formatting.');
+    }
 
-  const filtered = parsed.filter((q) => types.includes(q.type));
-  console.log(`✅ [Deck] Parsed ${filtered.length} valid questions`);
-  return filtered.slice(0, count);
+    const filtered = parsed.filter((q) => types.includes(q.type));
+    console.log(`✅ [Deck] Parsed ${filtered.length} valid questions`);
+    return filtered.slice(0, count);
 }
 export async function generateQuizFromPdf(pdfPath, types, count, difficulty) {
   console.log('📄 [PDF] Using RAW chunks — targeting exactly', count, 'questions');
@@ -90,40 +92,40 @@ export async function generateQuizFromPdf(pdfPath, types, count, difficulty) {
   const seen = new Set();
 
   const getPrompt = (chunk) => `
-You are an expert AI test writer.
+  You are an expert AI test writer.
 
-Generate exactly 3 quiz questions that:
-- Are based primarily on the lecture content provided below
-- Can also incorporate relevant external knowledge from your training to simulate real test environments
-- Reflect the style of challenging academic or standardized exams
-- Match the specified difficulty: "${difficulty}"
-- Use only these types: ${types.join(', ')}
+  Generate exactly 3 quiz questions that:
+  - Are based primarily on the lecture content provided below
+  - Can also incorporate relevant external knowledge from your training to simulate real test environments
+  - Reflect the style of challenging academic or standardized exams
+  - Match the specified difficulty: "${difficulty}"
+  - Use only these types: ${types.join(', ')}
 
-Instructions:
-- Mix factual recall with reasoning or application
-- Use your knowledge to enhance clarity and rigor
-- Ensure all questions are answerable using the lecture text and logical inference
-- Avoid repetitive phrasing or trivial questions
+  Instructions:
+  - Mix factual recall with reasoning or application
+  - Use your knowledge to enhance clarity and rigor
+  - Ensure all questions are answerable using the lecture text and logical inference
+  - Avoid repetitive phrasing or trivial questions
 
-Return ONLY valid JSON in the following format:
-[
-  {
-    "type": "mcq" | "short" | "fillblank" | "truefalse",
-    "question": "string",
-    "options": ["..."],        // only if type === "mcq"
-    "answer": "string or boolean",
-    "explanation": "string",
-    "difficulty": "${difficulty}"
-  }
-]
+  Return ONLY valid JSON in the following format:
+  [
+    {
+      "type": "mcq" | "short" | "fillblank" | "truefalse",
+      "question": "string",
+      "options": ["..."],        // only if type === "mcq"
+      "answer": "string or boolean",
+      "explanation": "string",
+      "difficulty": "${difficulty}"
+    }
+  ]
 
-No markdown, no commentary, no explanations outside JSON.
+  No markdown, no commentary, no explanations outside JSON.
 
-LECTURE TEXT:
-"""
-${chunk}
-"""
-`;
+  LECTURE TEXT:
+  """
+  ${chunk}
+  """
+  `;
 
   let attemptCount = 0;
   let chunkIndex = 0;
