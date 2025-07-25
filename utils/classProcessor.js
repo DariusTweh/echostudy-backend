@@ -86,7 +86,21 @@ ${syllabusText}
 
     if (classError) throw new Error('Failed to insert class: ' + classError.message);
     const classId = classInsert.id;
+    if (parsed.schedule && parsed.schedule.length > 0) {
+        const formattedSchedule = parsed.schedule.map(item => ({
+          class_id: classId,
+          user_id: userId,
+          date: item.date,
+          topic: item.topic,
+          chapter: item.chapter,
+        }));
 
+        const { error: scheduleError } = await supabase
+          .from('class_schedule')
+          .insert(formattedSchedule);
+
+        if (scheduleError) throw new Error('Failed to insert schedule: ' + scheduleError.message);
+      }
     if (parsed.assignments && parsed.assignments.length > 0) {
       const formattedAssignments = parsed.assignments.map(a => ({
         title: a.title,
