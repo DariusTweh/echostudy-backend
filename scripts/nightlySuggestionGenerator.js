@@ -1,6 +1,6 @@
 // scripts/nightlySuggestionGenerator.js
 import { createClient } from '@supabase/supabase-js';
-import { generateSmartSuggestions } from '../utils/smartEngine.js';
+import { generateSmartSuggestions } from '../utils/smartSuggestionEngine.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
