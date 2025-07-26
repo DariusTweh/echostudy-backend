@@ -29,11 +29,17 @@ async function runNightlySuggestions() {
       .eq('user_id', userId)
       .gte('created_at', new Date().toISOString().split('T')[0]);
 
-    for (const context of contexts) {
-      try {
-        const suggestions = await generateSmartSuggestions(userId, context);
+   for (const context of contexts) {
+  try {
+    if (['class', 'quiz'].includes(context)) {
+      const { data: classes } = await supabase
+        .from('classes')
+        .select('id')
+        .eq('user_id', userId);
 
-        // 🎯 Send notification if a top suggestion exists
+      for (const cls of classes || []) {
+        const suggestions = await generateSmartSuggestions(userId, context, cls.id);
+
         if (suggestions?.[0]) {
           const top = suggestions[0];
           await supabase.from('notifications').insert([
@@ -43,16 +49,33 @@ async function runNightlySuggestions() {
               body: top.text,
               context: top.context,
               metadata: top.metadata,
-              link: `/screen/${top.context}`, // you can route this client-side
+              link: `/screen/${top.context}`,
             },
           ]);
         }
-
-        console.log(`✅ ${context} suggestions generated for ${userId}`);
-      } catch (err) {
-        console.error(`❌ Error generating ${context} suggestions for ${userId}:`, err.message);
+        console.log(`✅ ${context} suggestions for class ${cls.id} ✅`);
       }
+    } else {
+      const suggestions = await generateSmartSuggestions(userId, context);
+      if (suggestions?.[0]) {
+        const top = suggestions[0];
+        await supabase.from('notifications').insert([
+          {
+            user_id: userId,
+            title: '🧠 New AI Study Suggestions Ready',
+            body: top.text,
+            context: top.context,
+            metadata: top.metadata,
+            link: `/screen/${top.context}`,
+          },
+        ]);
+      }
+      console.log(`✅ ${context} suggestions for ${userId} ✅`);
     }
+  } catch (err) {
+    console.error(`❌ Error generating ${context} suggestions for ${userId}:`, err.message);
+  }
+}
   }
 
   console.log('✅ Nightly suggestion job complete.');
