@@ -11,7 +11,7 @@ import classBuilderRoute from './routes/classBuilder.js';
 import voiceModeRouter from './routes/voiceMode.js';
 import flashcardRoutes from './routes/flashcards.js';
 import generateQuizRoutes from './routes/generateQuiz.js';
-
+import suggestionsRouter from './routes/smart.js'; // 👈 o
 const app = express();
 const port = 5000;
 
@@ -51,6 +51,7 @@ app.use('/api/flashcards', flashcardRoutes);
 app.use('/api', voiceModeRouter); // ✅ /api/voice-check
 app.use('/api/quizzes', generateQuizRoutes);
 app.use('/api/echochat', echoChatRoute); // 👈 Mount route
+app.use('/api', suggestionsRouter); //
 // ✅ Serve TTS mp3 files
 app.use('/output', express.static(outputDir));
 
