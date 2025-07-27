@@ -9,22 +9,21 @@ const supabase = createClient(
 );
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-async function generateAISuggestion(type, metadata = {}) {
-  const promptMap = {
-    assignment: `A student has an assignment titled "${metadata.title}" due on ${metadata.due_date}. Suggest a study reminder.`,
-    quiz_tag: `The student is weak on "${metadata.tag}". Suggest a quiz practice tip.`,
-    video: `Encourage watching "${metadata.videoTitle}" to understand "${metadata.topic}" better.`,
-    motivation: `Give a short, motivational message to help a student start their study session. Make it encouraging and not generic.`,
-  };
-
+const promptMap = {
+  assignment: `A student has an assignment titled "${metadata.title}" due on ${metadata.due_date}. Respond with a **short study reminder (max 1 sentence)** like "Review flashcards: Thermodynamics today" — keep it actionable and brief.`,
+  quiz_tag: `The student is weak on "${metadata.tag}". Respond with a **1-sentence quiz tip** like "Practice 3 questions on Enzyme Kinetics today" — no intros or explanations.`,
+  video: `Suggest a short encouragement to watch the video titled "${metadata.videoTitle}" to understand "${metadata.topic}". Keep it **1 sentence max**, like "Watch: Intro to Buffers (5 min)."`,
+  motivation: `Give a **1-sentence motivational message** to help a student start studying. It should sound real and not generic. Max 10 words.`,
+};
   const prompt = promptMap[type];
   if (!prompt) return '';
 
   const res = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.8,
-  });
+  model: 'gpt-4o-mini',
+  messages: [{ role: 'user', content: prompt }],
+  temperature: 0.8,
+  max_tokens: 40, // keep it tight
+});
 
   return res.choices?.[0]?.message?.content?.trim() || '';
 }
