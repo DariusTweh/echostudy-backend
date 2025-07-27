@@ -86,53 +86,96 @@ ${syllabusText}
 
     if (classError) throw new Error('Failed to insert class: ' + classError.message);
     const classId = classInsert.id;
+
+    // Insert class schedule
+    let sortedSchedule = [];
     if (parsed.schedule && parsed.schedule.length > 0) {
-        const formattedSchedule = parsed.schedule.map(item => ({
-          class_id: classId,
-          user_id: userId,
-          date: item.date,
-          topic: item.topic,
-          chapter: item.chapter,
-        }));
+      sortedSchedule = parsed.schedule.map((item, i) => ({
+        ...item,
+        dateObj: new Date(item.date),
+        lectureNum: i + 1,
+      })).sort((a, b) => a.dateObj - b.dateObj);
 
-        const { error: scheduleError } = await supabase
-          .from('class_schedule')
-          .insert(formattedSchedule);
-
-        if (scheduleError) throw new Error('Failed to insert schedule: ' + scheduleError.message);
-      }
-    if (parsed.assignments && parsed.assignments.length > 0) {
-      const formattedAssignments = parsed.assignments.map(a => ({
-        title: a.title,
-        due_date: /^\d{4}-\d{2}-\d{2}$/.test(a.dueDate) ? a.dueDate : null,
-        type: a.type,
-        priority: ['exam', 'quiz'].includes(a.type.toLowerCase()) ? 'High' : 'Normal',
+      const formattedSchedule = sortedSchedule.map(item => ({
         class_id: classId,
         user_id: userId,
+        date: item.date,
+        topic: item.topic,
+        chapter: item.chapter,
       }));
+
+      const { error: scheduleError } = await supabase
+        .from('class_schedule')
+        .insert(formattedSchedule);
+
+      if (scheduleError) throw new Error('Failed to insert schedule: ' + scheduleError.message);
+    }
+
+    // Insert assignments and match lectures to exams
+    let examMetaMap = {};
+    let formattedAssignments = [];
+
+    if (parsed.assignments && parsed.assignments.length > 0) {
+      const sortedExams = parsed.assignments
+        .filter(a => a.type.toLowerCase() === 'exam')
+        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+      for (let i = 0; i < sortedExams.length; i++) {
+        const exam = sortedExams[i];
+        const examDate = new Date(exam.dueDate);
+        const prevExamDate = i > 0 ? new Date(sortedExams[i - 1].dueDate) : null;
+
+        const coveredLectures = sortedSchedule.filter(l =>
+          (!prevExamDate || l.dateObj > prevExamDate) && l.dateObj <= examDate
+        );
+
+        const lectureRange = coveredLectures.length
+          ? `Lectures ${coveredLectures[0].lectureNum}–${coveredLectures[coveredLectures.length - 1].lectureNum}`
+          : null;
+
+        const topics = coveredLectures.map(l => l.topic).filter(Boolean);
+
+        examMetaMap[exam.title] = {
+          lecture_range: lectureRange,
+          covered_topics: topics,
+        };
+      }
+
+      formattedAssignments = parsed.assignments.map(a => {
+        const meta = examMetaMap[a.title] || {};
+        return {
+          title: a.title,
+          due_date: /^\d{4}-\d{2}-\d{2}$/.test(a.dueDate) ? a.dueDate : null,
+          type: a.type,
+          priority: ['exam', 'quiz'].includes(a.type.toLowerCase()) ? 'High' : 'Normal',
+          class_id: classId,
+          user_id: userId,
+          lecture_range: meta.lecture_range || null,
+          covered_topics: meta.covered_topics || null,
+        };
+      });
 
       const { error: assignErr } = await supabase.from('assignments').insert(formattedAssignments);
       if (assignErr) throw new Error('Failed to insert assignments: ' + assignErr.message);
+    }
 
-      const examAssignments = formattedAssignments.filter(a => a.type.toLowerCase() === 'exam');
-        console.log('🧪 Inserting exam decks with userId:', userId);
-      const examDecks = examAssignments.map(a => ({
-        title: `${parsed.title} - ${a.title} Deck`,
-        class_id: classId,
-        
-        user_id: userId,
-      }));
-      console.log('🧪 Deck payload:', examDecks);
+    // Insert exam flashcard decks
+    const examAssignments = formattedAssignments.filter(a => a.type.toLowerCase() === 'exam');
+    const examDecks = examAssignments.map(a => ({
+      title: `${parsed.title} - ${a.title} Deck`,
+      class_id: classId,
+      user_id: userId,
+      lecture_range: a.lecture_range,
+      covered_topics: a.covered_topics,
+    }));
 
-     const { data: insertedDecks, error: deckErr } = await supabase
+    const { data: insertedDecks, error: deckErr } = await supabase
       .from('flashcard_decks')
       .insert(examDecks)
       .select();
 
     if (deckErr) throw new Error('Failed to insert decks: ' + deckErr.message);
-
     console.log('✅ Inserted decks:', insertedDecks);
-    }
 
     return parsed;
   } catch (err) {
