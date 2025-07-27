@@ -31,104 +31,21 @@ async function generateAISuggestion(type, metadata = {}) {
 
 const suggestionGenerators = {
   dashboard: async (userId) => {
-    const suggestions = [];
-    const todayStr = new Date().toISOString().split('T')[0];
+  const suggestions = [];
+  const todayStr = new Date().toISOString().split('T')[0];
 
-    const { data: classes } = await supabase
-      .from('classes')
-      .select('id, title')
-      .eq('user_id', userId);
+  const { data: classes } = await supabase
+    .from('classes')
+    .select('id, title')
+    .eq('user_id', userId);
 
-    for (const cls of classes) {
-      const { data: assignments } = await supabase
-        .from('assignments')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('class_id', cls.id)
-        .gte('due_date', new Date().toISOString())
-        .order('due_date', { ascending: true })
-        .limit(1);
-
-      if (assignments?.[0]) {
-        const a = assignments[0];
-        let text;
-
-        if (a.type?.toLowerCase() === 'exam' && a.lecture_range && a.covered_topics?.length) {
-          text = `📌 ${a.title} — review ${a.lecture_range}: ${a.covered_topics.slice(0, 4).join(', ')}${a.covered_topics.length > 4 ? ', ...' : ''}`;
-        } else {
-          text = await generateAISuggestion('assignment', a);
-        }
-
-        suggestions.push({
-          user_id: userId,
-          class_id: cls.id,
-          type: 'daily_plan',
-          context: 'dashboard',
-          text,
-          metadata: { assignment_id: a.id },
-        });
-      }
-
-      const { data: overdueDecks } = await supabase
-        .from('user_deck_progress')
-        .select('deck_id')
-        .eq('user_id', userId)
-        .lt('next_review', new Date().toISOString());
-
-      for (const deck of overdueDecks?.slice(0, 1) || []) {
-        suggestions.push({
-          user_id: userId,
-          class_id: cls.id,
-          type: 'flashcard',
-          context: 'dashboard',
-          text: `Review flashcards in deck ID ${deck.deck_id} — it’s due today.`,
-          metadata: { deck_id: deck.deck_id },
-        });
-      }
-
-      const { data: scheduleToday } = await supabase
-        .from('class_schedule')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('class_id', cls.id)
-        .eq('date', todayStr)
-        .limit(1);
-
-      if (scheduleToday?.[0]) {
-        suggestions.push({
-          user_id: userId,
-          class_id: cls.id,
-          type: 'study',
-          context: 'dashboard',
-          text: `Study today’s topic: "${scheduleToday[0].topic}"`,
-          metadata: { topic: scheduleToday[0].topic },
-        });
-      }
-    }
-
-    const motivationText = await generateAISuggestion('motivation');
-    suggestions.push({
-      user_id: userId,
-      class_id: null,
-      type: 'motivation',
-      context: 'dashboard',
-      text: motivationText,
-      metadata: {},
-    });
-
-    return suggestions;
-  },
-
-  class: async (userId, classId) => {
-    const suggestions = [];
-    const todayStr = new Date().toISOString().split('T')[0];
-
+  for (const cls of classes) {
     const { data: assignments } = await supabase
       .from('assignments')
       .select('*')
       .eq('user_id', userId)
-      .eq('class_id', classId)
-      .gte('due_date', todayStr)
+      .eq('class_id', cls.id)
+      .gte('due_date', new Date().toISOString())
       .order('due_date', { ascending: true })
       .limit(1);
 
@@ -144,29 +61,48 @@ const suggestionGenerators = {
 
       suggestions.push({
         user_id: userId,
-        class_id: classId,
-        type: 'review',
-        context: 'class',
+        class_id: cls.id,
+        type: 'daily_plan',
+        context: 'dashboard',
         text,
         metadata: { assignment_id: a.id },
       });
     }
 
-    const { data: scheduleToday } = await supabase
+    const { data: overdueDecks } = await supabase
+      .from('user_deck_progress')
+      .select('deck_id')
+      .eq('user_id', userId)
+      .lt('next_review', new Date().toISOString());
+
+    for (const deck of overdueDecks?.slice(0, 1) || []) {
+      suggestions.push({
+        user_id: userId,
+        class_id: cls.id,
+        type: 'flashcard',
+        context: 'dashboard',
+        text: `Review flashcards in deck ID ${deck.deck_id} — it’s due today.`,
+        metadata: { deck_id: deck.deck_id },
+      });
+    }
+
+    const { data: schedule } = await supabase
       .from('class_schedule')
       .select('*')
       .eq('user_id', userId)
-      .eq('class_id', classId)
-      .eq('date', todayStr)
+      .eq('class_id', cls.id)
+      .lte('date', todayStr)
+      .order('date', { ascending: false })
       .limit(1);
 
-    if (scheduleToday?.[0]) {
-      const t = scheduleToday[0];
+    if (schedule?.[0]) {
+      const t = schedule[0];
+
       suggestions.push({
         user_id: userId,
-        class_id: classId,
+        class_id: cls.id,
         type: 'study',
-        context: 'class',
+        context: 'dashboard',
         text: `Study today’s topic: "${t.topic}"`,
         metadata: { topic: t.topic },
       });
@@ -180,34 +116,137 @@ const suggestionGenerators = {
 
         suggestions.push({
           user_id: userId,
-          class_id: classId,
+          class_id: cls.id,
           type: 'video',
-          context: 'class',
+          context: 'dashboard',
           text: videoText,
           metadata: { video_url: `https://www.youtube.com/watch?v=${yt[0].videoId}` },
         });
       }
+    } else {
+      suggestions.push({
+        user_id: userId,
+        class_id: cls.id,
+        type: 'study',
+        context: 'dashboard',
+        text: `🛌 No scheduled topic today — take a break or review older material.`,
+        metadata: {},
+      });
+    }
+  }
+
+  const motivationText = await generateAISuggestion('motivation');
+  suggestions.push({
+    user_id: userId,
+    class_id: null,
+    type: 'motivation',
+    context: 'dashboard',
+    text: motivationText,
+    metadata: {},
+  });
+
+  return suggestions;
+},
+
+ class: async (userId, classId) => {
+  const suggestions = [];
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const { data: assignments } = await supabase
+    .from('assignments')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('class_id', classId)
+    .gte('due_date', todayStr)
+    .order('due_date', { ascending: true })
+    .limit(1);
+
+  if (assignments?.[0]) {
+    const a = assignments[0];
+    let text;
+
+    if (a.type?.toLowerCase() === 'exam' && a.lecture_range && a.covered_topics?.length) {
+      text = `📌 ${a.title} — review ${a.lecture_range}: ${a.covered_topics.slice(0, 4).join(', ')}${a.covered_topics.length > 4 ? ', ...' : ''}`;
+    } else {
+      text = await generateAISuggestion('assignment', a);
     }
 
-    const { data: weakTags } = await supabase.rpc('get_weak_topics', {
+    suggestions.push({
       user_id: userId,
       class_id: classId,
+      type: 'review',
+      context: 'class',
+      text,
+      metadata: { assignment_id: a.id },
+    });
+  }
+
+  const { data: schedule } = await supabase
+    .from('class_schedule')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('class_id', classId)
+    .lte('date', todayStr)
+    .order('date', { ascending: false })
+    .limit(1);
+
+  if (schedule?.[0]) {
+    const t = schedule[0];
+    suggestions.push({
+      user_id: userId,
+      class_id: classId,
+      type: 'study',
+      context: 'class',
+      text: `Study today’s topic: "${t.topic}"`,
+      metadata: { topic: t.topic },
     });
 
-    if (weakTags?.[0]) {
-      const quizText = await generateAISuggestion('quiz_tag', { tag: weakTags[0].tag });
+    const yt = await fetchYoutubeSuggestions(t.topic);
+    if (yt?.[0]) {
+      const videoText = await generateAISuggestion('video', {
+        videoTitle: yt[0].title,
+        topic: t.topic,
+      });
+
       suggestions.push({
         user_id: userId,
         class_id: classId,
-        type: 'quiz',
+        type: 'video',
         context: 'class',
-        text: quizText,
-        metadata: { tag: weakTags[0].tag },
+        text: videoText,
+        metadata: { video_url: `https://www.youtube.com/watch?v=${yt[0].videoId}` },
       });
     }
+  } else {
+    suggestions.push({
+      user_id: userId,
+      class_id: classId,
+      type: 'study',
+      context: 'class',
+      text: `🛌 No scheduled topic today — use this time to review or relax.`,
+      metadata: {},
+    });
+  }
 
-    return suggestions;
-  },
+  const { data: weakTags } = await supabase.rpc('get_weak_topics', {
+    user_id: userId,
+    class_id: classId,
+  });
+
+  if (weakTags?.[0]) {
+    const quizText = await generateAISuggestion('quiz_tag', { tag: weakTags[0].tag });
+    suggestions.push({
+      user_id: userId,
+      class_id: classId,
+      type: 'quiz',
+      context: 'class',
+      text: quizText,
+      metadata: { tag: weakTags[0].tag },
+    });
+  }
+
+  return suggestions;
+},
 
   quiz: async (userId, classId) => {
     const suggestions = [];
@@ -279,14 +318,15 @@ const suggestionGenerators = {
     return suggestions;
   },
 
-  semester: async (userId) => {
-    const suggestions = [];
+semester: async (userId) => {
+  const suggestions = [];
 
-    const { data: overdue } = await supabase.rpc('get_overdue_reviews_by_class', {
-      user_id: userId,
-    });
+  const { data: overdue } = await supabase.rpc('get_overdue_reviews_by_class', {
+    user_id: userId,
+  });
 
-    for (const o of overdue?.slice(0, 2) || []) {
+  if (overdue?.length > 0) {
+    for (const o of overdue.slice(0, 2)) {
       suggestions.push({
         user_id: userId,
         class_id: o.class_id,
@@ -296,12 +336,23 @@ const suggestionGenerators = {
         metadata: { class_id: o.class_id },
       });
     }
-
-    const { data: weakTags } = await supabase.rpc('get_weakest_tags_across_classes', {
+  } else {
+    suggestions.push({
       user_id: userId,
+      class_id: null,
+      type: 'review',
+      context: 'semester',
+      text: `✅ You’re caught up on reviews for now — great work.`,
+      metadata: {},
     });
+  }
 
-    for (const w of weakTags?.slice(0, 1) || []) {
+  const { data: weakTags } = await supabase.rpc('get_weakest_tags_across_classes', {
+    user_id: userId,
+  });
+
+  if (weakTags?.length > 0) {
+    for (const w of weakTags.slice(0, 1)) {
       suggestions.push({
         user_id: userId,
         class_id: w.class_id,
@@ -311,9 +362,11 @@ const suggestionGenerators = {
         metadata: { tag: w.tag },
       });
     }
+  }
 
-    return suggestions;
-  },
+  return suggestions;
+},
+
 };
 
 export async function generateSmartSuggestions(userId, context = 'dashboard', classId = null) {
