@@ -33,20 +33,32 @@ console.log('🧾 Raw body:', req.body);
     }
 
     let questions = [];
+    const normalizedSource = source.trim().toLowerCase();
+  switch (normalizedSource) {
+  case 'deck':
+    if (!deckId) return res.status(400).json({ error: 'Missing deckId' });
+    questions = await generateQuizFromDeck(deckId, types, numberOfQuestions, difficulty);
+    break;
 
-   if (source === 'deck') {
-  if (!deckId) return res.status(400).json({ error: 'Missing deckId' });
-  questions = await generateQuizFromDeck(deckId, types, numberOfQuestions, difficulty); // ✅ pass difficulty
-} else if (source === 'pdf') {
-  if (!pdfPath) return res.status(400).json({ error: 'Missing pdfPath' });
-  questions = await generateQuizFromPdf(pdfPath, types, numberOfQuestions, difficulty); // ✅ pass difficulty
-}else {
-      return res.status(400).json({ error: 'Unsupported source type' });
-    }
+  case 'pdf':
+  case 'class_resource':
+    if (!pdfPath) return res.status(400).json({ error: 'Missing pdfPath' });
+    questions = await generateQuizFromPdf(pdfPath, types, numberOfQuestions, difficulty);
+    break;
 
-    if (!questions || questions.length === 0) {
-      return res.status(500).json({ error: 'No quiz questions generated' });
-    }
+  case 'manual':
+    if (!req.body.topic) return res.status(400).json({ error: 'Missing topic' });
+    questions = await generateQuizFromTopic(req.body.topic, types, numberOfQuestions, difficulty);
+    break;
+
+  default:
+    return res.status(400).json({ error: 'Unsupported source type' });
+}
+
+// Final safety check
+if (!questions || questions.length === 0) {
+  return res.status(500).json({ error: 'No quiz questions generated' });
+}
 
     // Save quiz metadata
     const { data: quizData, error: quizError } = await supabase
