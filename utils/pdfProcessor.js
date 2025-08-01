@@ -13,7 +13,7 @@ import os from 'os';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 export async function downloadPdfFromUrl(url) {
   const response = await axios.get(url, { responseType: 'arraybuffer' });
