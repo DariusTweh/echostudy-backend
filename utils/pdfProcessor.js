@@ -47,19 +47,20 @@ export async function processPdfToNotes(filePath, originalName, userId, notebook
         messages: [
           {
             role: 'user',
-            content:  `
-          Convert the following lecture page into clean, well-structured HTML notes for display in a mobile rich text editor.
+            content: `
+                Generate full HTML lecture notes for the following content.
 
-          Guidelines:
-          - Format using proper <p>, <h3>, and <strong> tags.
-          - No asterisks, hashtags, or Markdown.
-          - Use short paragraphs for clarity.
-          - Avoid long lists unless necessary.
+                🧾 Guidelines:
+                - Return a full HTML document using: \`\`\`html ... \`\`\` format
+                - Wrap the content in: <!DOCTYPE html><html><head>...</head><body>...</body></html>
+                - Use valid HTML5 tags only: <h3>, <p>, <strong>, <ul>, <ol>, <li>, etc.
+                - Do NOT use Markdown formatting (no *, #, -, etc.)
+                - Use semantic structure and clean indentation
 
-          Lecture content:
-          ----------------------
-          ${cleaned}
-              `,
+                Here is the lecture content:
+                --------------------------
+                ${cleaned}
+                `,
           },
         ],
         temperature: 0.4,
@@ -67,13 +68,15 @@ export async function processPdfToNotes(filePath, originalName, userId, notebook
 
       aiNote = completion.choices[0].message.content?.trim() || aiNote;
     }
+    // Remove markdown-style ```html wrapper if it exists
+    const htmlOnly = aiNote.replace(/```html\n?/, '').replace(/```$/, '').trim();
 
     generatedPages.push({
       id: i + 1,
-      content: aiNote,
+      content: htmlOnly,
     });
   }
-
+  
   const { data, error } = await supabase
     .from('notes')
     .insert([
