@@ -47,7 +47,19 @@ export async function processPdfToNotes(filePath, originalName, userId, notebook
         messages: [
           {
             role: 'user',
-            content: `Create clear, organized notes from this lecture page:\n\n${cleaned}`,
+            content:  `
+          Convert the following lecture page into clean, well-structured HTML notes for display in a mobile rich text editor.
+
+          Guidelines:
+          - Format using proper <p>, <h3>, and <strong> tags.
+          - No asterisks, hashtags, or Markdown.
+          - Use short paragraphs for clarity.
+          - Avoid long lists unless necessary.
+
+          Lecture content:
+          ----------------------
+          ${cleaned}
+              `,
           },
         ],
         temperature: 0.4,
