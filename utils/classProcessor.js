@@ -86,6 +86,17 @@ ${syllabusText}
 
     if (classError) throw new Error('Failed to insert class: ' + classError.message);
     const classId = classInsert.id;
+    // 🗒️ Create default notebook for this class
+    const { error: notebookError } = await supabase.from('notebooks').insert({
+      title: `${parsed.title} Notebook`,
+      class_id: classId,
+      user_id: userId,
+      color: '#22C55E', // ✅ Optional: default color
+    });
+
+    if (notebookError) {
+      throw new Error('Failed to insert default notebook: ' + notebookError.message);
+    }
 
     // Insert class schedule
     let sortedSchedule = [];
